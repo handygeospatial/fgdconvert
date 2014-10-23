@@ -197,12 +197,16 @@ class PolygonFeature
       end
       def end_element(name)
         if CLASSES.include?(name)
-          g = GeoRuby::SimpleFeatures::Polygon.from_coordinates(@coordinates)
-          g.tile(@params[:z]) {|path, g_|
-            next unless g_.class == GeoRuby::SimpleFeatures::Polygon
-            @geojsonl[:geometry] = JSON::parse(g_.as_geojson)
-            print "#{path}\t#{JSON::generate(@geojsonl)}\n"
-          }
+          begin
+            g = GeoRuby::SimpleFeatures::Polygon.from_coordinates(@coordinates)
+            g.tile(@params[:z]) {|path, g_|
+              next unless g_.class == GeoRuby::SimpleFeatures::Polygon
+              @geojsonl[:geometry] = JSON::parse(g_.as_geojson)
+              print "#{path}\t#{JSON::generate(@geojsonl)}\n"
+            }
+          rescue
+            $stderr.print $!
+          end
         else
           case name
           when 'type', 'fid', 'vis', 'admOffice', 'devDate', 'lfSpanFr', 'name', 'admCode'
@@ -266,12 +270,16 @@ class LineStringFeature
       end
       def end_element(name)
         if CLASSES.include?(name)
-          g = GeoRuby::SimpleFeatures::LineString.from_coordinates(@coordinates)
-          g.tile(@params[:z]) {|path, g_|
-            next unless g_.class == GeoRuby::SimpleFeatures::LineString
-            @geojsonl[:geometry] = JSON::parse(g_.as_geojson)
-            print "#{path}\t#{JSON::generate(@geojsonl)}\n"
-          }
+          begin
+            g = GeoRuby::SimpleFeatures::LineString.from_coordinates(@coordinates)
+            g.tile(@params[:z]) {|path, g_|
+              next unless g_.class == GeoRuby::SimpleFeatures::LineString
+              @geojsonl[:geometry] = JSON::parse(g_.as_geojson)
+              print "#{path}\t#{JSON::generate(@geojsonl)}\n"
+            }
+          rescue
+            $stderr.print $!
+          end
         else
           case name
           when 'type', 'fid', 'vis', 'admOffice', 'devDate', 'lfSpanFr'
