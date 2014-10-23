@@ -10,4 +10,5 @@ FGD to Vector Tiles converter on Hadoop
 4. rake
 
 ※hadoopを使うので、ディスクをかなり必要とする。
+
 ※特にDEMについて、おそらく変換に問題がある場合がある。今後修正。
