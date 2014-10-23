@@ -205,7 +205,7 @@ class PolygonFeature
               print "#{path}\t#{JSON::generate(@geojsonl)}\n"
             }
           rescue
-            $stderr.print $!
+            $stderr.print $!, "\n"
           end
         else
           case name
@@ -278,7 +278,7 @@ class LineStringFeature
               print "#{path}\t#{JSON::generate(@geojsonl)}\n"
             }
           rescue
-            $stderr.print $!
+            $stderr.print $!, "\n"
           end
         else
           case name
