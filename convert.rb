@@ -1,8 +1,10 @@
 # coding: utf-8
 require 'json'
+require 'find'
 require 'nokogiri'
 require 'georuby-ext'
 require 'geo_ruby/geojson'
+require 'zip' # gem install rubyzip
 
 # Meshcode is probably Japanese English.
 module Meshcode
@@ -103,7 +105,7 @@ class DEM
     (left, top) = Meshcode::lefttop(params[:meshcode])
     skip = true
     count = 0
-    File.foreach(params[:path], encoding: 'cp932') {|l|
+    params[:stream].foreach {|l|
       if l.include?('<gml:tupleList>')
         skip = false
         next
@@ -238,7 +240,7 @@ class PolygonFeature
 
   def parse(params)
     @sax_document.set_params(params)
-    @sax_parser.parse(File.open(params[:path]))
+    @sax_parser.parse(params[:stream])
   end
 end
 
@@ -305,7 +307,7 @@ class LineStringFeature
 
   def parse(params)
     @sax_document.set_params(params)
-    @sax_parser.parse(File.open(params[:path]))
+    @sax_parser.parse(params[:stream])
   end
 end
 
@@ -365,35 +367,42 @@ class PointFeature
 
   def parse(params)
     @sax_document.set_params(params)
-    @sax_parser.parse(File.open(params[:path]))
+    @sax_parser.parse(params[:stream])
   end
 end
 
-ARGV.each {|path|
-  next unless /xml$/.match path
-  r = File.basename(path, '.xml').split('-')
-  r.pop if r[-1].size == 4
-  next unless r.shift == 'FG'
-  next unless r.shift == 'GML'
-  datePublished = r.pop.insert(4, '-').insert(7, '-')
-  type = r.pop
-  meshcode = r.join
-  params = {:path => path, :type => type, :meshcode => meshcode, :z => 18,
-    :datePublished => datePublished}
-  if LineStringFeature::CLASSES.include?(type)
-    LineStringFeature.new.parse(params)
-  elsif PointFeature::CLASSES.include?(type)
-    PointFeature.new.parse(params)
-  elsif PolygonFeature::CLASSES.include?(type)
-    PolygonFeature.new.parse(params)
-  else
-    case type
-    when 'DEM5A', 'DEM5B'
-      Kernel.const_get(type).new.parse(params)
-    when 'dem10a', 'dem10b'
-      Kernel.const_get(type.upcase).new.parse(params)
-    else
-      # print "converter for #{type} not implemented.\n"
-    end
-  end
+Find.find('source') {|path|
+  next unless path.include?('ALL')
+  $stderr.print("Processing #{path}.\n")
+  Zip::File.open(path) {|zip|
+    zip.each {|entry|
+      next unless /xml$/.match entry.name
+      r = File.basename(entry.name, '.xml').split('-')
+      r.pop if r[-1].size == 4
+      next unless r.shift == 'FG'
+      next unless r.shift == 'GML'
+      datePublished = r.pop.insert(4, '-').insert(7, '-')
+      type = r.pop
+      meshcode = r.join
+      params = {:path => entry.name, :type => type, 
+        :meshcode => meshcode, :z => 18, :stream => entry.get_input_stream,
+        :datePublished => datePublished}
+      if LineStringFeature::CLASSES.include?(type)
+        LineStringFeature.new.parse(params)
+      elsif PointFeature::CLASSES.include?(type)
+        PointFeature.new.parse(params)
+      elsif PolygonFeature::CLASSES.include?(type)
+        PolygonFeature.new.parse(params)
+      else
+        case type
+        when 'DEM5A', 'DEM5B'
+          Kernel.const_get(type).new.parse(params)
+        when 'dem10a', 'dem10b'
+          Kernel.const_get(type.upcase).new.parse(params)
+        else
+          # print "converter for #{type} not implemented.\n"
+        end
+      end
+    }
+  }
 }
