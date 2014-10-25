@@ -1,6 +1,7 @@
 # coding: utf-8
-require 'json'
 require 'find'
+require 'json'
+require 'zlib'
 require 'nokogiri'
 require 'georuby-ext'
 require 'geo_ruby/geojson'
@@ -127,7 +128,7 @@ class DEM
             :type => type, :height => height.to_f,
             :datePublished => params[:datePublished]
         }}
-        print "#{params[:z]}/#{x}/#{y}.geojson\t#{JSON::dump(f)}\n"
+        params[:ost].print "#{params[:z]}/#{x}/#{y}.geojson\t#{JSON::dump(f)}\n"
         count += 1
       end
     }
@@ -204,7 +205,7 @@ class PolygonFeature
             g.tile(@params[:z]) {|path, g_|
               next unless g_.class == GeoRuby::SimpleFeatures::Polygon
               @geojsonl[:geometry] = JSON::parse(g_.as_geojson)
-              print "#{path}\t#{JSON::generate(@geojsonl)}\n"
+              @params[:ost].print "#{path}\t#{JSON::generate(@geojsonl)}\n"
             }
           rescue
             $stderr.print $!, "\n"
@@ -277,7 +278,7 @@ class LineStringFeature
             g.tile(@params[:z]) {|path, g_|
               next unless g_.class == GeoRuby::SimpleFeatures::LineString
               @geojsonl[:geometry] = JSON::parse(g_.as_geojson)
-              print "#{path}\t#{JSON::generate(@geojsonl)}\n"
+              @params[:ost].print "#{path}\t#{JSON::generate(@geojsonl)}\n"
             }
           rescue
             $stderr.print $!, "\n"
@@ -343,7 +344,7 @@ class PointFeature
           x = x.to_i
           y = y.to_i
           path = "#{@params[:z]}/#{x}/#{y}.geojson"
-          print "#{path}\t#{JSON::generate(@geojsonl)}\n"
+          @params[:ost].print "#{path}\t#{JSON::generate(@geojsonl)}\n"
         else
           case name
           when 'type', 'fid', 'vis', 'admOffice', 'devDate', 'lfSpanFr', 'orgName', 'gcpClass', 'gcpCode', 'name'
@@ -371,38 +372,44 @@ class PointFeature
   end
 end
 
-Find.find('source') {|path|
-  next unless path.include?('ALL')
-  $stderr.print("Processing #{path}.\n")
-  Zip::File.open(path) {|zip|
-    zip.each {|entry|
-      next unless /xml$/.match entry.name
-      r = File.basename(entry.name, '.xml').split('-')
-      r.pop if r[-1].size == 4
-      next unless r.shift == 'FG'
-      next unless r.shift == 'GML'
-      datePublished = r.pop.insert(4, '-').insert(7, '-')
-      type = r.pop
-      meshcode = r.join
-      params = {:path => entry.name, :type => type, 
-        :meshcode => meshcode, :z => 18, :stream => entry.get_input_stream,
-        :datePublished => datePublished}
-      if LineStringFeature::CLASSES.include?(type)
-        LineStringFeature.new.parse(params)
-      elsif PointFeature::CLASSES.include?(type)
-        PointFeature.new.parse(params)
-      elsif PolygonFeature::CLASSES.include?(type)
-        PolygonFeature.new.parse(params)
-      else
-        case type
-        when 'DEM5A', 'DEM5B'
-          Kernel.const_get(type).new.parse(params)
-        when 'dem10a', 'dem10b'
-          Kernel.const_get(type.upcase).new.parse(params)
-        else
-          # print "converter for #{type} not implemented.\n"
-        end
-      end
+Find.find('(your FGD directory)') {|path|
+  next unless /(5439|5440|5638|5639)\d\d-ALL/.match path
+  $stderr.print("Processing #{File.basename(path)}.\n")
+  File.open('a.geojson.gz', 'w') {|w|
+    Zlib::GzipWriter.wrap(w) {|gz|
+      Zip::File.open(path) {|zip|
+        zip.each {|entry|
+          next unless /xml$/.match entry.name
+          $stderr.print(" Processing #{entry.name}\n")
+          r = File.basename(entry.name, '.xml').split('-')
+          r.pop if r[-1].size == 4
+          next unless r.shift == 'FG'
+          next unless r.shift == 'GML'
+          datePublished = r.pop.insert(4, '-').insert(7, '-')
+          type = r.pop
+          meshcode = r.join
+          params = {:path => entry.name, :type => type, 
+            :meshcode => meshcode, :z => 18, :stream => entry.get_input_stream,
+            :ost => gz, :datePublished => datePublished}
+          if LineStringFeature::CLASSES.include?(type)
+            LineStringFeature.new.parse(params)
+          elsif PointFeature::CLASSES.include?(type)
+            PointFeature.new.parse(params)
+          elsif PolygonFeature::CLASSES.include?(type)
+            PolygonFeature.new.parse(params)
+          else
+            case type
+            when 'DEM5A', 'DEM5B'
+              Kernel.const_get(type).new.parse(params)
+            when 'dem10a', 'dem10b'
+              Kernel.const_get(type.upcase).new.parse(params)
+            else
+              # print "converter for #{type} not implemented.\n"
+            end
+          end
+        }
+      }
     }
   }
+  FileUtils.mv('a.geojson.gz', "input/#{File.basename(path).sub('zip', 'geojson.gz')}")
 }
