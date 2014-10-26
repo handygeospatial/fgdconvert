@@ -26,6 +26,9 @@ html, body, #mapdiv {height: 100%; width: 100%;}
 .admpt {
 }
 .blda {
+  stroke: none;
+  fill: #ffe6be;
+  //fill-opacity: 1;
 }
 .bldl {
   stroke: #ff7d23;
@@ -51,8 +54,12 @@ html, body, #mapdiv {height: 100%; width: 100%;}
   stroke: #46b3ff;
 }
 .elevpt {
+  stroke: #888;
+  fill: #f00;
 }
 .gcp {
+  stroke: #f00;
+  fill: #f00;
 }
 .railcl {
   stroke: #640000;
@@ -73,6 +80,9 @@ html, body, #mapdiv {height: 100%; width: 100%;}
   stroke: #f00;
 }
 .wa {
+  stroke: none;
+  fill: #bed2ff;
+  //fill-opacity: 1;
 }
 .wl {
   stroke: #46b3ff;
@@ -97,18 +107,29 @@ var std = L.tileLayer(
   'http://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
     maxZoom: 18, maxNativeZoom: 18, attribution: '地理院タイル（標準地図）'});
 var fgd = new L.TileLayer.GeoJSON(
-  'http://cyberjapandata.gsi.go.jp/xyz/experimental_fgd/{z}/{x}/{y}.geojson', {
+  './dst/{z}/{x}/{y}.geojson', {
     minZoom: 18, maxNativeZoom: 18, maxZoom: 24, 
     attribution: '基盤地図情報（実験）'
   }, {
+    filter: function(feat) {
+      return !(feat.properties.class == 'AdmArea')
+    },
+    pointToLayer: function(feat, latlng) {
+      return L.circleMarker(latlng, {
+        radius: 2
+      });
+    },
     style: function(feat) {
       var className = 'data ' + feat.properties.class.toLowerCase() +
-        (feat.properties.type == '堅ろう建物' ? ' bldl_kenro' : '') +
-        (feat.properties.type == '普通建物' ? ' bldl_futsu' : '') +
-        (feat.properties.type == '堅ろう無壁舎' ? ' bldl_futsu' : '') +
         (feat.properties.type == '一条河川' ? ' wl_ichijo' : '') +
         (feat.properties.type == 'トンネル内の鉄道' ? ' railcl_tunnel' : '') +
         (feat.properties.vis == '非表示' ? ' hidden' : '');
+      if(feat.properties.class == 'BldL') {
+        className += 
+          (feat.properties.type == '堅ろう建物' ? ' bldl_kenro' : '') +
+          (feat.properties.type == '普通建物' ? ' bldl_futsu' : '') +
+          (feat.properties.type == '堅ろう無壁舎' ? ' bldl_futsu' : '');
+      }
       feat.className = className;
       return {
         className: className
@@ -130,7 +151,7 @@ var fgd = new L.TileLayer.GeoJSON(
     }
   });
 var map = L.map('mapdiv', {
-  center: [36.1046, 140.0858], zoom: 18,
+  center: [36.08664, 139.35727], zoom: 18,
   layers: [std, fgd]});
 
 var hash = L.hash(map);

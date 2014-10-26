@@ -372,10 +372,16 @@ class PointFeature
   end
 end
 
-Find.find('(your FGD directory)') {|path|
+Find.find('(your fgd directory)') {|path|
   next unless /(5439|5440|5638|5639)\d\d-ALL/.match path
-  $stderr.print("Processing #{File.basename(path)}.\n")
-  File.open('a.geojson.gz', 'w') {|w|
+  $stderr.print "Processing #{File.basename(path)}.\n"
+  dst_path = "input/#{File.basename(path).sub('zip', 'geojson.gz')}"
+  if File.exist?(dst_path) 
+    $stderr.print " #{dst_path} already exists.\n"
+    next
+  end
+  tmp_path = 'a.geojson.gz'
+  File.open(tmp_path, 'w') {|w|
     Zlib::GzipWriter.wrap(w) {|gz|
       Zip::File.open(path) {|zip|
         zip.each {|entry|
@@ -411,5 +417,5 @@ Find.find('(your FGD directory)') {|path|
       }
     }
   }
-  FileUtils.mv('a.geojson.gz', "input/#{File.basename(path).sub('zip', 'geojson.gz')}")
+  FileUtils.mv(tmp_path, dst_path)
 }
